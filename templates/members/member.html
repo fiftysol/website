@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block header %}
+	<link rel="stylesheet" type="text/css" href="/static/announcements/index.css">
+	<link rel="stylesheet" type="text/css" href="/static/members/index.css">
+	<script type="text/javascript">var dont_load_announcements_on_start = true;</script>
+	<script type="text/javascript" src="/static/announcements/index.js"></script>
+{% endblock %}
+
+{% block content %}
+	{% include "navbar.html" %}
+
+	{% if not member %}
+		{% if mid == "@me" and request.user.logged %}
+			<script>
+				popup({
+					title: "Member not found",
+					type: "error",
+					html: "You must join our server first!"
+				});
+			</script>
+		{% else %}
+			<script>
+				popup({
+					title: "Member not found",
+					type: "error",
+					html: "The given member was not found! Are you this member? Edit a field in your profile first!"
+				});
+			</script>
+		{% endif %}
+	{% else %}
+		<div class="top-separator"></div>
+
+		<div id="members-content">
+			<div class="member">
+				{% for role in member.roles %}
+					<span class="member-name" style="color:#{{ role.1 }};">{{ role.0 }}</span>
+					{% if not forloop.last %}
+						<span class="member-name">|</span>
+					{% endif %}
+				{% endfor %}<br><br>
+
+				<img src="https://cdn.discordapp.com/{{ member.discord.avatar }}?size=128" class="member-avatar-small big-round">
+				<div style="display:inline-block;text-align:left;padding-left:.3rem;margin-left:.3rem;">
+					<span class="member-name" style="margin-left:0;color:#{{ member.discord.color }};">{{ member.discord.name }}</span>
+					{% if member.status %}
+						<br><span class="ping">
+							“{% autoescape off %}{{ member.status }}{% endautoescape %}”
+						</span>
+					{% endif %}
+					{% if member.gender == 0 %}
+						<br><span class="ping" style="color:rgb(45, 170, 255);background-color:rgba(45, 170, 255, .1)">Male</span>
+					{% elif member.gender == 1 %}
+						<br><span class="ping" style="color:rgb(255, 105, 180);background-color:rgba(255, 105, 180|, .1)">Female</span>
+					{% endif %}
+				</div>
+
+				<div class="outer-fields-container">
+					{% for role in member.roles %}
+						{% if role.0 == "Module Member" and member.1 %}
+							{% if member.1.since or member.1.hosting %}
+								<div class="fields-container">
+									<span><span class="member-name" style="color:#{{ role.1 }};">{{ role.0 }}</span> fields</span>
+									{% if member.1.since %}
+										<span class="field-title">Member since:</span> <code class="inline">{{ member.1.since }}</code><br>
+									{% endif %}
+									{% if member.1.hosting %}
+										<span class="field-title">Hosted modules:</span> <code class="inline">{{ member.1.hosting }}</code><br>
+									{% endif %}
+								</div>
+							{% endif %}
+						{% elif role.0 == "Developer" and member.2 %}
+							{% if member.2.modules or member.2.github %}
+								<div class="fields-container">
+									<span><span class="member-name" style="color:#{{ role.1 }};">{{ role.0 }}</span> fields</span>
+									{% if member.2.modules %}
+										<span class="field-title">Modules:</span> <code class="inline">{{ member.2.modules }}</code><br>
+									{% endif %}
+									{% if member.2.github %}
+										<span class="field-title">GitHub:</span> <code class="inline"><a href="https://github.com/{{ member.2.github }}/" target="_blank">{{ member.2.github }}</a></code><br>
+									{% endif %}
+								</div>
+							{% endif %}
+						{% elif role.0 == "Artist" and member.3 %}
+							{% if member.3.deviantart %}
+								<div class="fields-container">
+									<span><span class="member-name" style="color:#{{ role.1 }};">{{ role.0 }}</span> fields</span>
+									{% if member.3.deviantart %}
+										<span class="field-title">DeviantArt:</span> <code class="inline"><a href="https://www.deviantart.com/{{ member.3.deviantart }}/" target="_blank">{{ member.3.deviantart }}</a></code><br>
+									{% endif %}
+								</div>
+							{% endif %}
+						{% elif role.0 == "Translator" and member.4 %}
+							{% if member.4.trad %}
+								<div class="fields-container">
+									<span><span class="member-name" style="color:#{{ role.1 }};">{{ role.0 }}</span> fields</span>
+									{% if member.4.trad %}
+										<span class="field-title">Modules Translated:</span> <code class="inline">{{ member.4.trad }}</code><br>
+									{% endif %}
+								</div>
+							{% endif %}
+						{% elif role.0 == "Mapper" and member.5 %}
+							{% if member.5.perms %}
+								<div class="fields-container">
+									<span><span class="member-name" style="color:#{{ role.1 }};">{{ role.0 }}</span> fields</span>
+									{% if member.5.perms %}
+										<span class="field-title">HighPerm Maps:</span> <code class="inline">{{ member.5.perms }}</code><br>
+									{% endif %}
+								</div>
+							{% endif %}
+						{% elif role.0 == "Event Manager" and member.6 %}
+							{% if member.6.evt %}
+								<div class="fields-container">
+									<span><span class="member-name" style="color:#{{ role.1 }};">{{ role.0 }}</span> fields</span>
+									{% if member.6.evt %}
+										<span class="field-title">Events Created:</span> <code class="inline">{{ member.6.evt }}</code><br>
+									{% endif %}
+								</div>
+							{% endif %}
+						{% elif role.0 == "Writer" and member.11 %}
+							{% if member.11.wattpad %}
+								<div class="fields-container">
+									<span><span><span class="member-name" style="color:#{{ role.1 }};">{{ role.0 }}</span> fields</span>
+									{% if member.11.wattpad %}
+										<span class="field-title">Wattpad:</span> <code class="inline"><a href="https://www.wattpad.com/user/{{ member.11.wattpad }}/" target="_blank">{{ member.11.wattpad }}</a></code><br>
+									{% endif %}
+								</div>
+							{% endif %}
+						{% endif %}
+					{% endfor %}
+
+					{% if member.nickname or member.bday or member.insta %}
+						<div class="fields-container">
+							<span><span class="member-name">Member</span> fields</span>
+							{% if member.nickname %}
+								<span class="field-title">TFM Nickname:</span> <code class="inline">{{ member.nickname }}</code><br>
+							{% endif %}
+							{% if member.bday %}
+								<span class="field-title">Birthday:</span> <code class="inline">{{ member.bday }}</code><br>
+							{% endif %}
+							{% if member.insta %}
+								<span class="field-title">Instagram:</span> <code class="inline"><a href="https://instagram.com/{{ member.insta }}/" target="_blank">{{ member.insta }}</a></code><br>
+							{% endif %}
+						</div>
+					{% endif %}
+				</div>
+			</div>
+		</div>
+	{% endif %}
+{% endblock %}

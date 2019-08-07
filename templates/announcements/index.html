@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block metatitle %}Announcements - Fifty Shades of Lua{% endblock %}
+{% block title %}Announcements - Fifty Shades of Lua{% endblock %}
+
+{% block header %}
+	<link rel="stylesheet" type="text/css" href="/static/announcements/index.css">
+	<script type="text/javascript">var dont_load_announcements_on_start = false;</script>
+	<script type="text/javascript" src="/static/announcements/index.js"></script>
+{% endblock %}
+
+{% block content %}
+	{% include "navbar.html" %}
+	<div class="top-separator"></div>
+	<div id="announcements-loader"></div>
+	<div id="announcements-pagination" class="announcements-pagination">
+		<nav style="display:inline;">
+			<ul class="pagination custom-pagination-left" style="display:inline-flex;">
+				<li class="page-item active" id="channel-big"><a class="page-link" href="#" onclick="javascript:change_channel('big');">#announcements</a></li>
+				<li class="page-item" id="channel-small"><a class="page-link" href="#" onclick="javascript:change_channel('small');">#small-announcements</a></li>
+			</ul>
+		</nav>
+		<nav class="custom-pagination-right">
+			<ul class="pagination">
+				{% for page in available_pages %}
+					<li class="page-item{% if page == 0 %} active{% endif %}" id="page-{{ page }}">
+						<a class="page-link" href="#" onclick="javascript:change_page({{ page }});">
+							{{ page|add:"1" }}
+						</a>
+					</li>
+				{% endfor %}
+			</ul>
+		</nav>
+	</div>
+	<div id="announcements-content"></div>
+{% endblock %}

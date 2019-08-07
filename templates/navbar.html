@@ -1,0 +1,75 @@
+<nav class="navbar navbar-expand-md navbar-dark" id="navigation-bar">
+	<a class="navbar-brand" href="#"><img src="/static/home/icon.png" class="hovered-round navbar-img"></a>
+	<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+		<span class="navbar-toggler-icon"></span>
+	</button>
+
+	<div class="collapse navbar-collapse" id="navbarSupportedContent">
+		<ul class="navbar-nav mr-auto">
+			<li class="nav-item">
+				<a class="nav-link" href="https://discord.gg/quch83R" target="_blank">Discord</a>
+			</li>
+			<li class="nav-item{% if where == 'home' %} active{% endif %}">
+				<a class="nav-link" href="/">{{ translate.home }}</a>
+			</li>
+			<li class="nav-item dropdown">
+				<a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+					{{ translate.tools }}
+				</a>
+				<div class="dropdown-menu dark-dropdown-menu" aria-labelledby="toolsDropdown">
+					<button class="dropdown-item{% if where == 'members' %} btn-dark active{% endif %}" type="button" onclick="javascript:window.location.href='/members/';">
+						{{ translate.members }}
+					</button>
+					<button class="dropdown-item{% if where == 'statistics' %} btn-dark active{% endif %}" type="button" onclick="javascript:window.location.href='#';">
+						{{ translate.statistics }}
+					</button>
+					<button class="dropdown-item{% if where == 'announcements' %} btn-dark active{% endif %}" type="button" onclick="javascript:window.location.href='/announcements/';">
+						{{ translate.announcements }}
+					</button>
+				</div>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link dropdown-toggle" onclick="javascript:language_selector();" href="#" id="languageDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">{{ translate.language }}</a>
+			</li>
+		</ul>
+		<ul class="navbar-nav ml-auto">
+			{% if not request.user.logged %}
+				<li class="nav-item">
+					<a class="nav-link" href="/api/oauth2/authorize/?link={{ request.get_full_path }}">
+						{{ translate.login }}
+					</a>
+				</li>
+			{% else %}
+				<li class="nav-item dropdown">
+					<a class="nav-link dropdown-toggle user-menu" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+						<img src="https://cdn.discordapp.com/{{ request.user.avatar_endpoint }}.png?size=64" class="big-round navbar-img">
+						{{ request.user.full_name }}
+					</a>
+					<div class="dropdown-menu dropdown-menu-right dark-dropdown-menu" aria-labelledby="navbarDropdown">
+						{% for item in dropdown_menu_items %}
+							{% if item.show %}
+								{% if item.type == "separator" %}
+									<div class="dropdown-divider"></div>
+								{% elif item.type == "header" %}
+									<h6 class="dropdown-header">
+										{{ item.text }}
+									</h6>
+								{% elif item.type == "link" %}
+									<button class="dropdown-item" type="button" onclick="javascript:window.location.href='{{ item.link }}';">
+										{{ item.text }}
+									</button>
+								{% endif %}
+							{% endif %}
+						{% endfor %}
+					</div>
+				</li>
+			{% endif %}
+		</ul>
+	</div>
+</nav>
+
+<script>
+	after_load(function(){
+		$("#navigation-bar").addClass("fixed-top");
+	});
+</script>
