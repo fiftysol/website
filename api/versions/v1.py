@@ -29,6 +29,8 @@ def supported_methods(name, *methods):
 		def wrapper(self, request, *args, **kwargs):
 			if request.method not in methods:
 				return classes.ErrorJSONResponse(text + request.method + " ones.", status=405)
+		return wrapper
+	return decorator
 
 def get_permissions(host, access, user_id, *accesses):
 	role_ids = accesses[0]
