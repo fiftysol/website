@@ -373,20 +373,29 @@ class TranslationEndpoint:
 			elif not request.user.logged:
 				return classes.ErrorJSONResponse("You must be logged in first in order to add/modify a language.", status=403)
 
-			data = send_and_recv(request.globals.socket, {
-				"type": "user_roles",
-				"user": request.user.id
-			})
-			if host == "@website":
-				if not "585148219395276801" in data["role_ids"] and request.user.id != "285878295759814656":
-					return classes.ErrorJSONResponse(
-						"You need the moderator role in the discord server in order to add/modify a language owned by @website.", status=403
-					)
+			if host[0] == ":": # It is a project!
+				user = projects.get_project_user(host[1:], request.user.id)
 
-			elif not f"★ #{host}" in data["role_names"]:
-				return classes.ErrorJSONResponse(
-					f"You need to be #{host} owner in the discord server in order to add/modify a language owned by the module.", status=403
-				)
+				if user is None:
+					return classes.ErrorJSONResponse("The project was not found or you're not a project member.", status=403)
+				elif (not user.permissions & project.CREATE_LANGUAGE) and (not user.permissions & project.ADMINISTRATOR) and not user.owner:
+					return classes.ErrorJSONResponse("You need the CREATE_LANGUAGE permission in order to do it.", status=403)
+
+			else:
+				data = send_and_recv(request.globals.socket, {
+					"type": "user_roles",
+					"user": request.user.id
+				})
+				if host == "@website":
+					if not "585148219395276801" in data["role_ids"] and request.user.id != "285878295759814656":
+						return classes.ErrorJSONResponse(
+							"You need the moderator role in the discord server in order to add/modify a language owned by @website.", status=403
+						)
+
+				elif not f"★ #{host}" in data["role_names"]:
+					return classes.ErrorJSONResponse(
+						f"You need to be #{host} owner in the discord server in order to add/modify a language owned by the module.", status=403
+					)
 
 			code = language
 			language = translation.get_language(host, language)
@@ -411,20 +420,29 @@ class TranslationEndpoint:
 			if not request.user.logged:
 				return classes.ErrorJSONResponse("You must be logged in first in order to add/modify a language.", status=403)
 
-			data = send_and_recv(request.globals.socket, {
-				"type": "user_roles",
-				"user": request.user.id
-			})
-			if host == "@website":
-				if not "585148219395276801" in data["role_ids"] and request.user.id != "285878295759814656":
-					return classes.ErrorJSONResponse(
-						"You need the moderator role in the discord server in order to delete a language owned by @website.", status=403
-					)
+			if host[0] == ":":
+				user = projects.get_project_user(host[1:], request.user.id)
 
-			elif not f"★ #{host}" in data["role_names"]:
-				return classes.ErrorJSONResponse(
-					f"You need to be #{host} owner in the discord server in order to delete a language owned by the module.", status=403
-				)
+				if user is None:
+					return classes.ErrorJSONResponse("The project was not found or you're not a project member.", status=403)
+				elif (not user.permissions & project.ADMINISTRATOR) and not user.owner:
+					return classes.ErrorJSONResponse("You need the ADMINISTRATOR permission in order to do it.", status=403)
+
+			else:
+				data = send_and_recv(request.globals.socket, {
+					"type": "user_roles",
+					"user": request.user.id
+				})
+				if host == "@website":
+					if not "585148219395276801" in data["role_ids"] and request.user.id != "285878295759814656":
+						return classes.ErrorJSONResponse(
+							"You need the moderator role in the discord server in order to delete a language owned by @website.", status=403
+						)
+
+				elif not f"★ #{host}" in data["role_names"]:
+					return classes.ErrorJSONResponse(
+						f"You need to be #{host} owner in the discord server in order to delete a language owned by the module.", status=403
+					)
 
 			language = translation.get_language(host, language)
 			if language is None:
@@ -444,7 +462,12 @@ class TranslationEndpoint:
 				"type": "user_roles",
 				"user": request.user.id
 			})
-			create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
+			if host[0] == ":":
+				user = projects.get_project_user(host[1:], request.user.id)
+
+				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user is not None)
+			else:
+				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
 
 			if not create and not edit:
 				return classes.ErrorJSONResponse("You can't edit or create any translation field in the given host-language pair.", status=403)
@@ -524,19 +547,33 @@ class TranslationEndpoint:
 			if language is None:
 				return classes.ErrorJSONResponse("The given host-language pair was not found.", status=404)
 
-			if language.access & 1:
-				pass
-			elif request.user.logged:
-				data = send_and_recv(request.globals.socket, {
-					"type": "user_roles",
-					"user": request.user.id
-				})
-				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
+			if host[0] == ":":
+				if request.user.logged:
+					data = send_and_recv(request.globals.socket, {
+						"type": "user_roles",
+						"user": request.user.id
+					})
+					user = projects.get_project_user(host[1:], request.user.id)
+
+					create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user is not None)
+				else:
+					create, edit = get_permissions(language.host, language.access, "0", [], False)
 
 				if not create:
 					return classes.ErrorJSONResponse("Missing permissions.", status=403)
+
 			else:
-				return classes.ErrorJSONResponse("Missing permissions.", status=403)
+				if language.access & 1:
+					pass
+				elif request.user.logged:
+					data = send_and_recv(request.globals.socket, {
+						"type": "user_roles",
+						"user": request.user.id
+					})
+					if not create:
+						return classes.ErrorJSONResponse("Missing permissions.", status=403)
+				else:
+					return classes.ErrorJSONResponse("Missing permissions.", status=403)
 
 			response = {
 				"default": language.default,
@@ -616,7 +653,12 @@ class TranslationEndpoint:
 				"type": "user_roles",
 				"user": request.user.id
 			})
-			create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
+			if host[0] == ":":
+				user = projects.get_project_user(host[1:], request.user.id)
+
+				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user is not None)
+			else:
+				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
 
 			if not (create and edit):
 				return classes.ErrorJSONResponse("You must be able to create and edit translation fields in the given host-language pair.")
@@ -660,16 +702,26 @@ class TranslationEndpoint:
 						"type": "user_roles",
 						"user": request.user.id
 					})
+					user = projects.get_project_user(host[1:], request.user.id)
 
 				for language in languages:
-					if language.access & 1:
-						continue
-					elif request.user.logged:
-						create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
+					if host[0] == ":":
+						create, edit = get_permissions(
+							language.host, language.access, request.user.id if request.user.logged else "0",
+							data["role_ids"] if request.user.logged else [], user is not None if request.user.logged else False
+						)
+
 						if not create:
 							return classes.ErrorJSONResponse("Missing permissions.", status=403)
 					else:
-						return classes.ErrorJSONResponse("Missing permissions.", status=403)
+						if language.access & 1:
+							continue
+						elif request.user.logged:
+							create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
+							if not create:
+								return classes.ErrorJSONResponse("Missing permissions.", status=403)
+						else:
+							return classes.ErrorJSONResponse("Missing permissions.", status=403)
 
 				fnc = getattr(self, f"translation_compile_to_{output}")
 				result = []
@@ -682,19 +734,33 @@ class TranslationEndpoint:
 			if language is None:
 				return classes.ErrorJSONResponse("The given host-language pair was not found.", status=404)
 
-			if language.access & 1:
-				pass
-			elif request.user.logged:
-				data = send_and_recv(request.globals.socket, {
-					"type": "user_roles",
-					"user": request.user.id
-				})
-				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
+			if host[0] == ":":
+				if request.user.logged:
+					data = send_and_recv(request.globals.socket, {
+						"type": "user_roles",
+						"user": request.user.id
+					})
+					user = projects.get_project_user(host[1:], request.user.id)
+
+					create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user is not None)
+				else:
+					create, edit = get_permissions(language.host, language.access, "0", [], False)
 
 				if not create:
 					return classes.ErrorJSONResponse("Missing permissions.", status=403)
+
 			else:
-				return classes.ErrorJSONResponse("Missing permissions.", status=403)
+				if language.access & 1:
+					pass
+				elif request.user.logged:
+					data = send_and_recv(request.globals.socket, {
+						"type": "user_roles",
+						"user": request.user.id
+					})
+					if not create:
+						return classes.ErrorJSONResponse("Missing permissions.", status=403)
+				else:
+					return classes.ErrorJSONResponse("Missing permissions.", status=403)
 
 			queryset = translation.LanguageField.objects.filter(host__iexact=language.host, language__iexact=language.code, state=3)
 			return HttpResponse(getattr(self, f"translation_compile_to_{output}")(queryset, language), content_type="text/plain")
