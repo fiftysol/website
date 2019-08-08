@@ -76,6 +76,17 @@ def get_permissions(host, access, user_id, *accesses):
 			(f"★ #{host}" in role_names)
 		)
 
+def is_subset(a, b):
+	if b & projects.ADMINISTRATOR:
+		return False
+	for bit in range(max(a.bit_length(), b.bit_length())):
+		if (not a & (1 << bit)) and (b & (1 << bit)):
+			return False
+	return True
+
+def is_superset(a, b):
+	return is_subset(b, a)
+
 class GraphsEndpoint:
 	available_graphs = [
 		"commands",
@@ -767,14 +778,130 @@ class ProjectsEndpoint:
 	def projects_members_view(self, request, path, *, filter):
 		filter = filter.lower()
 
+		if "users" not in request.data or not isinstance(request.data["users"], list):
+			return self.malformed()
+
 		if request.method == "POST": # Add a new member
-			pass
+			for user in request.data["users"]:
+				if not isinstance(user, str) or not user.isdigit():
+					return self.malformed()
+
+			if not request.user.logged:
+				return ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
+
+			user = projects.get_project_user(filter, request.user.id)
+			if user is None:
+				return ErrorJSONResponse("The project was not found or you're not a member of it.", status=404)
+
+			elif (not user.permissions & projects.ADD_NEW_MEMBERS) and (not user.permissions & projects.ADMINISTRATOR) and not user.owner:
+				return ErrorJSONResponse("You need the ADD_NEW_MEMBERS permission in order to do this.", status=403)
+
+			data = send_and_recv({
+				"type": "get_user_info",
+				"users": request.data["users"]
+			})
+			bulk = []
+			result = {}
+			for user in request.data["users"]:
+				if data[user] is not None:
+					bulk.append(projects.ProjectUser(
+						id=user, role="Member", project=user.project,
+						owner=False, public=False, permissions=0
+					))
+					result[user] = True
+				else:
+					result[user] = False
+
+			if len(bulk) > 0:
+				projects.ProjectUser.objects.bulk_create(bulk)
+			return JSONResponse(result)
 
 		elif request.method == "PATCH": # Edit a member
-			pass
+			user_ids = {}
+			for user in request.data["users"]:
+				if not isinstance(user, dict) or "id" not in user or not isinstance(user["id"], str) or not user["id"].isdigit():
+					return self.malformed()
+				else:
+					user_ids[int(user["id"])] = user
+
+			if not request.user.logged:
+				return ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
+
+			me = None
+			users = projects.get_project_users(filter)
+			if users is None:
+				return ErrorJSONResponse("The project was not found.", status=404)
+			for user in users:
+				if str(user.id) == request.user.id:
+					me = user
+					break
+			if me is None:
+				return ErrorJSONResponse("You're not a member of the project.", status=404)
+
+			elif (not me.permissions & projects.EDIT_PERMISSIONS) and (not me.permissions & projects.ADMINISTRATOR) and not me.owner:
+				return ErrorJSONResponse("You need the EDIT_PERMISSIONS permission in order to do this.", status=403)
+
+			if not me.owner:
+				for user in users:
+					if user.id in user_ids:
+						if not (user.permissions != me.permissions and is_subset(me.permissions, user.permissions)) and user.id != me.id:
+							return ErrorJSONResponse(f"You can't edit <@{user.id}>'s data.", status=403)
+
+			for user in users:
+				if user.id in user_ids:
+					_user = user_ids[user.id]
+					if me.owner or user.id != me.id:
+						if "role" in _user:
+							user.role = _user["role"]
+						if me.owner and "public" in _user:
+							user.public = _user["public"]
+						if "permissions" in _user:
+							if is_subset(me.permissions, _user["permissions"]) or me.owner:
+								user.permissions = _user["permissions"]
+
+					elif user.id == me.id:
+						if "public" in _user:
+							user.public = _user["public"]
 
 		elif request.method == "DELETE": # Remove a member
-			pass
+			for user in request.data["users"]:
+				if not isinstance(user, str) or not user.isdigit():
+					return self.malformed()
+
+			if not request.user.logged:
+				return ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
+
+			if request.data["users"] == [request.user.id]:
+				user = projects.get_project_user(filter, request.user.id)
+				if user is None:
+					return ErrorJSONResponse("The project was not found or you're not a project member.", status=404)
+				if user.owner:
+					return ErrorJSONResponse("You can't leave the project. Delete it instead.", status=403)
+				else:
+					user.delete()
+				return
+
+			me = None
+			users = projects.get_project_users(filter)
+			if users is None:
+				return ErrorJSONResponse("The project was not found.", status=404)
+			for user in users:
+				if str(user.id) == request.user.id:
+					me = user
+					break
+			if me is None:
+				return ErrorJSONResponse("You're not a member of the project.", status=403)
+
+			elif (not me.permissions & projects.REMOVE_MEMBERS) and (not me.permissions & projects.ADMINISTRATOR) and not me.owner:
+				return ErrorJSONResponse("You need the REMOVE_MEMBERS permission in order to do this.", status=403)
+
+			if not me.owner:
+				for user in users:
+					if str(user.id) in request.data["users"]:
+						if not (user.permissions != me.permissions and is_subset(me.permissions, user.permissions)):
+							return ErrorJSONResponse(f"You can't remove <@{user.id}> from the project.", status=403)
+
+			projects.ProjectUser.objects.filter(project__iexact=me.project, user__in=request.data["users"]).delete()
 
 	@supported_methods("projects", "GET", "POST", "PATCH", "DELETE")
 	def projects_view(self, request, path, *, filter_type, filter):
