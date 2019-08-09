@@ -5,7 +5,7 @@ class HeadersMiddleware:
 		self.get_response = get_response
 
 	def __call__(self, request):
-		if re.search(r"(?i)^api/", request.path) is not None:
+		if re.search(r"(?i)^/api/", request.path) is not None:
 			sessid = request.headers.get("session", None)
 			if sessid is not None:
 				request.COOKIES["sessionid"] = sessid
