@@ -228,7 +228,7 @@ class TemplateRenderer:
 
 class HomeTemplate(TemplateRenderer):
 	template = "home/index.html"
-	regex = r"^$"
+	regex = r"^/*$"
 	context = {
 		"where": "home",
 		"member_role_check": [
@@ -289,7 +289,7 @@ class HomeTemplate(TemplateRenderer):
 
 class AnnouncementsTemplate(TemplateRenderer):
 	template = "announcements/index.html"
-	regex = r"^announcements/*$"
+	regex = r"(?i)^announcements/*$"
 	context = {
 		"where": "announcements",
 		"available_pages": list(range(5))
@@ -297,7 +297,7 @@ class AnnouncementsTemplate(TemplateRenderer):
 
 class MembersTemplate(TemplateRenderer):
 	template = "members/index.html"
-	regex = r"^members/*$"
+	regex = r"(?i)^members/*$"
 	context = {
 		"where": "members"
 	}
@@ -329,7 +329,7 @@ class MembersTemplate(TemplateRenderer):
 
 class SpecificMemberTemplate(TemplateRenderer):
 	template = "members/member.html"
-	regex = r"^members/+(?P<mid>.+?)(?:/*|/+.*)$"
+	regex = r"(?i)^members/+(?P<mid>.+?)(?:/*|/+.*)$"
 	context = {
 		"where": "members",
 		"member_role_check": [

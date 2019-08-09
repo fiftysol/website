@@ -20,9 +20,9 @@ import api.views
 import common.views
 
 urlpatterns = [
-    re_path(r"^api/v(?P<version>\d+)/(?P<path>.+)$", api.views.view),
-	re_path(r"^api/(?P<path>.+)$", api.views.default_view),
-	re_path(r"^static/+(?P<path>.+)$", common.views.Static().view),
+    re_path(r"(?i)^api/v(?P<version>\d+)/(?P<path>.+)$", api.views.view),
+	re_path(r"(?i)^api/(?P<path>.+)$", api.views.default_view),
+	re_path(r"(?i)^static/+(?P<path>.+)$", common.views.Static().view),
 	common.views.HomeTemplate().as_url(),
     common.views.AnnouncementsTemplate().as_url(),
     common.views.MembersTemplate().as_url(),
