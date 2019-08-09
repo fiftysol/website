@@ -29,7 +29,7 @@ def supported_methods(name, *methods):
 		def wrapper(self, request, *args, **kwargs):
 			if request.method not in methods:
 				return classes.ErrorJSONResponse(text + request.method + " ones.", status=405)
-			return fnc(request, *args, **kwargs)
+			return fnc(self, request, *args, **kwargs)
 		return wrapper
 	return decorator
 
