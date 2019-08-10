@@ -9,8 +9,11 @@ ADD_NEW_MEMBERS = (1 << 5)
 REMOVE_MEMBERS = (1 << 6)
 EDIT_PERMISSIONS = (1 << 7)
 
-def get_projects_by_user(user, owner=False):
-	user_queryset = ProjectUser.objects.filter(user=user, owner=owner)
+def get_projects_by_user(user, owner=None):
+	if owner is None:
+		user_queryset = ProjectUser.objects.filter(id=user)
+	else:
+		user_queryset = ProjectUser.objects.filter(id=user, owner=owner)
 	projects_filter = []
 
 	for user in user_queryset:
@@ -38,6 +41,6 @@ def get_project_user(project, user):
 		project = project.name
 
 	try:
-		return ProjectUser.objects.get(project__iexact=project, user=user)
+		return ProjectUser.objects.get(project__iexact=project, id=user)
 	except ProjectUser.DoesNotExist:
 		return None
