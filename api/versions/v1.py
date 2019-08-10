@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from common.utils import send_and_recv
 
 import translation.backend as translation
+import translation.setup as translation_setup
 import projects.backend as projects
 import common.classes as classes
 import api.versions.base as base
@@ -24,10 +25,18 @@ mpl.rcParams["text.color"] = "gray"
 from matplotlib import pyplot as plt
 
 def supported_methods(name, *methods):
-	text = f"/{name}/ endpoint only supports " + (", ".join(methods[:-1]) if len(methods) > 1 else methods[0]) + " requests, but not "
+	_methods = list(methods)
+	if "OPTIONS" not in methods:
+		_methods.append("OPTIONS")
+	text = f"/{name}/ endpoint only supports " + (", ".join(_methods[:-1]) + " and " + _methods[-1] if len(_methods) > 1 else _methods[0]) + " requests, but not "
 	def decorator(fnc):
 		def wrapper(self, request, *args, **kwargs):
-			if request.method not in methods:
+			is_in = request.method in methods
+			if request.method == "OPTIONS" and not is_in:
+				resp = HttpResponse()
+				resp["Allow"] = ",".join(_methods)
+				return resp
+			elif not is_in:
 				return classes.ErrorJSONResponse(text + request.method + " ones.", status=405)
 			return fnc(self, request, *args, **kwargs)
 		return wrapper
@@ -379,7 +388,7 @@ class TranslationEndpoint:
 
 				if user is None:
 					return classes.ErrorJSONResponse("The project was not found or you're not a project member.", status=403)
-				elif (not user.permissions & project.CREATE_LANGUAGE) and (not user.permissions & project.ADMINISTRATOR) and not user.owner:
+				elif (not user.permissions & projects.CREATE_LANGUAGE) and (not user.permissions & projects.ADMINISTRATOR) and not user.owner:
 					return classes.ErrorJSONResponse("You need the CREATE_LANGUAGE permission in order to do it.", status=403)
 
 			else:
@@ -411,7 +420,7 @@ class TranslationEndpoint:
 					)
 
 			else:
-				for parameter in ["host", "default", "name", "access"]:
+				for parameter in ["default", "name", "access"]:
 					if parameter in request.data:
 						setattr(language, parameter, request.data[parameter])
 
@@ -426,7 +435,7 @@ class TranslationEndpoint:
 
 				if user is None:
 					return classes.ErrorJSONResponse("The project was not found or you're not a project member.", status=403)
-				elif (not user.permissions & project.ADMINISTRATOR) and not user.owner:
+				elif (not user.permissions & projects.ADMINISTRATOR) and not user.owner:
 					return classes.ErrorJSONResponse("You need the ADMINISTRATOR permission in order to do it.", status=403)
 
 			else:
@@ -466,7 +475,7 @@ class TranslationEndpoint:
 			if host[0] == ":":
 				user = projects.get_project_user(host[1:], request.user.id)
 
-				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user is not None)
+				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user)
 			else:
 				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
 
@@ -556,9 +565,9 @@ class TranslationEndpoint:
 					})
 					user = projects.get_project_user(host[1:], request.user.id)
 
-					create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user is not None)
+					create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user)
 				else:
-					create, edit = get_permissions(language.host, language.access, "0", [], False)
+					create, edit = get_permissions(language.host, language.access, "0", [], None)
 
 				if not create:
 					return classes.ErrorJSONResponse("Missing permissions.", status=403)
@@ -657,7 +666,7 @@ class TranslationEndpoint:
 			if host[0] == ":":
 				user = projects.get_project_user(host[1:], request.user.id)
 
-				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user is not None)
+				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user)
 			else:
 				create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], data["role_names"])
 
@@ -743,9 +752,9 @@ class TranslationEndpoint:
 					})
 					user = projects.get_project_user(host[1:], request.user.id)
 
-					create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user is not None)
+					create, edit = get_permissions(language.host, language.access, request.user.id, data["role_ids"], user)
 				else:
-					create, edit = get_permissions(language.host, language.access, "0", [], False)
+					create, edit = get_permissions(language.host, language.access, "0", [], None)
 
 				if not create:
 					return classes.ErrorJSONResponse("Missing permissions.", status=403)
@@ -810,7 +819,7 @@ class ProjectsEndpoint:
 			"users": users
 		}
 		available = project.public
-		if not project.public:
+		if request.user.logged:
 			me = int(request.user.id)
 
 		_users = projects.get_project_users(project)
@@ -854,16 +863,27 @@ class ProjectsEndpoint:
 					return self.malformed()
 
 			if not request.user.logged:
-				return ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
+				return classes.ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
 
-			user = projects.get_project_user(filter, request.user.id)
-			if user is None:
-				return ErrorJSONResponse("The project was not found or you're not a member of it.", status=404)
+			me = None
+			users = projects.get_project_users(filter)
+			if users is None:
+				return classes.ErrorJSONResponse("The project was not found.", status=404)
+			for user in users:
+				if str(user.id) == request.user.id:
+					me = user
+					break
+			if me is None:
+				return classes.ErrorJSONResponse("You're not a member of the project.", status=404)
 
-			elif (not user.permissions & projects.ADD_NEW_MEMBERS) and (not user.permissions & projects.ADMINISTRATOR) and not user.owner:
-				return ErrorJSONResponse("You need the ADD_NEW_MEMBERS permission in order to do this.", status=403)
+			elif (not me.permissions & projects.ADD_NEW_MEMBERS) and (not me.permissions & projects.ADMINISTRATOR) and not me.owner:
+				return classes.ErrorJSONResponse("You need the ADD_NEW_MEMBERS permission in order to do this.", status=403)
 
-			data = send_and_recv({
+			for user in users:
+				if str(user.id) in request.data["users"]:
+					return classes.ErrorJSONResponse(f"<@{user.id}> is already a member of the project.", status=400)
+
+			data = send_and_recv(request.globals.socket, {
 				"type": "get_user_info",
 				"users": request.data["users"]
 			})
@@ -872,7 +892,7 @@ class ProjectsEndpoint:
 			for user in request.data["users"]:
 				if data[user] is not None:
 					bulk.append(projects.ProjectUser(
-						id=user, role="Member", project=user.project,
+						id=user, role="Member", project=me.project,
 						owner=False, public=False, permissions=0
 					))
 					result[user] = True
@@ -881,7 +901,7 @@ class ProjectsEndpoint:
 
 			if len(bulk) > 0:
 				projects.ProjectUser.objects.bulk_create(bulk)
-			return JSONResponse(result)
+			return classes.JSONResponse(result)
 
 		elif request.method == "PATCH": # Edit a member
 			user_ids = {}
@@ -892,43 +912,51 @@ class ProjectsEndpoint:
 					user_ids[int(user["id"])] = user
 
 			if not request.user.logged:
-				return ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
+				return classes.ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
 
 			me = None
 			users = projects.get_project_users(filter)
 			if users is None:
-				return ErrorJSONResponse("The project was not found.", status=404)
+				return classes.ErrorJSONResponse("The project was not found.", status=404)
 			for user in users:
 				if str(user.id) == request.user.id:
 					me = user
 					break
 			if me is None:
-				return ErrorJSONResponse("You're not a member of the project.", status=404)
+				return classes.ErrorJSONResponse("You're not a member of the project.", status=404)
 
 			elif (not me.permissions & projects.EDIT_PERMISSIONS) and (not me.permissions & projects.ADMINISTRATOR) and not me.owner:
-				return ErrorJSONResponse("You need the EDIT_PERMISSIONS permission in order to do this.", status=403)
+				return classes.ErrorJSONResponse("You need the EDIT_PERMISSIONS permission in order to do this.", status=403)
 
 			if not me.owner:
 				for user in users:
 					if user.id in user_ids:
-						if not (user.permissions != me.permissions and is_subset(me.permissions, user.permissions)) and user.id != me.id:
-							return ErrorJSONResponse(f"You can't edit <@{user.id}>'s data.", status=403)
+						if user.owner or (not (user.permissions != me.permissions and is_subset(me.permissions, user.permissions)) and user.id != me.id):
+							return classes.ErrorJSONResponse(f"You can't edit <@{user.id}>'s data.", status=403)
 
 			for user in users:
 				if user.id in user_ids:
 					_user = user_ids[user.id]
+					mod = False
 					if me.owner or user.id != me.id:
 						if "role" in _user:
 							user.role = _user["role"]
+							mod = True
 						if me.owner and "public" in _user:
 							user.public = _user["public"]
+							mod = True
 						if "permissions" in _user:
 							if is_subset(me.permissions, _user["permissions"]) or me.owner:
 								user.permissions = _user["permissions"]
+								mod = True
 
 					elif user.id == me.id:
 						if "public" in _user:
 							user.public = _user["public"]
+							mod = True
+
+					if mod:
+						user.save()
 
 		elif request.method == "DELETE": # Remove a member
 			for user in request.data["users"]:
@@ -936,39 +964,44 @@ class ProjectsEndpoint:
 					return self.malformed()
 
 			if not request.user.logged:
-				return ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
+				return classes.ErrorJSONResponse("You must be logged in first in order to do this.", status=403)
 
 			if request.data["users"] == [request.user.id]:
 				user = projects.get_project_user(filter, request.user.id)
 				if user is None:
-					return ErrorJSONResponse("The project was not found or you're not a project member.", status=404)
+					return classes.ErrorJSONResponse("The project was not found or you're not a project member.", status=404)
 				if user.owner:
-					return ErrorJSONResponse("You can't leave the project. Delete it instead.", status=403)
+					return classes.ErrorJSONResponse("You can't leave the project. Delete it instead.", status=403)
 				else:
 					user.delete()
 				return
 
+			else:
+				for user in request.data["users"]:
+					if user == request.user.id:
+						return classes.ErrorJSONResponse("You can't remove members at the same time that you leave the project.", status=400)
+
 			me = None
 			users = projects.get_project_users(filter)
 			if users is None:
-				return ErrorJSONResponse("The project was not found.", status=404)
+				return classes.ErrorJSONResponse("The project was not found.", status=404)
 			for user in users:
 				if str(user.id) == request.user.id:
 					me = user
 					break
 			if me is None:
-				return ErrorJSONResponse("You're not a member of the project.", status=403)
+				return classes.ErrorJSONResponse("You're not a member of the project.", status=403)
 
 			elif (not me.permissions & projects.REMOVE_MEMBERS) and (not me.permissions & projects.ADMINISTRATOR) and not me.owner:
-				return ErrorJSONResponse("You need the REMOVE_MEMBERS permission in order to do this.", status=403)
+				return classes.ErrorJSONResponse("You need the REMOVE_MEMBERS permission in order to do this.", status=403)
 
 			if not me.owner:
 				for user in users:
 					if str(user.id) in request.data["users"]:
 						if not (user.permissions != me.permissions and is_subset(me.permissions, user.permissions)):
-							return ErrorJSONResponse(f"You can't remove <@{user.id}> from the project.", status=403)
+							return classes.ErrorJSONResponse(f"You can't remove <@{user.id}> from the project.", status=403)
 
-			projects.ProjectUser.objects.filter(project__iexact=me.project, user__in=request.data["users"]).delete()
+			projects.ProjectUser.objects.filter(project__iexact=me.project, id__in=request.data["users"]).delete()
 
 	@supported_methods("projects", "GET", "POST", "PATCH", "DELETE")
 	def projects_view(self, request, path, *, filter_type, filter):
@@ -984,8 +1017,12 @@ class ProjectsEndpoint:
 			if filter_type == "@":
 				result = {"projects": []}
 
-				projects = projects.get_projects_by_user(filter, owner=filter == "mine")
-				for project in projects:
+				user_filter = request.user.id if filter == "me" or filter == "mine" else filter
+				if filter == "mine":
+					_projects = projects.get_projects_by_user(user_filter, owner=True)
+				else:
+					_projects = projects.get_projects_by_user(user_filter)
+				for project in _projects:
 					project = self.get_project_dict(request, project)
 
 					if project is not None:
@@ -1014,14 +1051,14 @@ class ProjectsEndpoint:
 
 			if not request.user.logged:
 				return classes.ErrorJSONResponse("You must be logged in first.", status=403)
-			data = send_and_recv({
+			data = send_and_recv(request.globals.socket, {
 				"type": "user_roles",
 				"user": request.user.id
 			})
 			if "Developer" not in data["role_names"]:
 				return classes.ErrorJSONResponse("You must have the Developer role in the discord server first.", status=403)
 
-			project = self.get_project(filter)
+			project = projects.get_project(filter)
 			if project:
 				return classes.ErrorJSONResponse("The project already exists.", status=403)
 
@@ -1049,20 +1086,20 @@ class ProjectsEndpoint:
 			if not (user.owner or user.permissions & projects.ADMINISTRATOR):
 				if "description" in request.data and not user.permissions & projects.EDIT_DESCRIPTION:
 					return classes.ErrorJSONResponse("You don't have the EDIT_DESCRIPTION permission.", status=403)
-				elif "name" in request.data and not user.permissions & projects.EDIT_NAME:
+				if "name" in request.data and not user.permissions & projects.EDIT_NAME:
 					return classes.ErrorJSONResponse("You don't have the EDIT_NAME permission.", status=403)
-				elif "public" in request.data and not user.permissions & projects.EDIT_PUB_STATE:
+				if "public" in request.data and not user.permissions & projects.EDIT_PUB_STATE:
 					return classes.ErrorJSONResponse("You don't have the EDIT_PUB_STATE permission.", status=403)
 
 			kwargs = {}
 			if "description" in request.data:
 				kwargs["description"] = request.data["description"]
-			elif "name" in request.data:
+			if "name" in request.data:
 				kwargs["name"] = request.data["name"].lower()
 				translation.Language.objects.filter(host__iexact=filter).update(host=":" + kwargs["name"])
 				translation.LanguageField.objects.filter(host__iexact=filter).update(host=":" + kwargs["name"])
 				projects.ProjectUser.objects.filter(project__iexact=filter).update(project=kwargs["name"])
-			elif "public" in request.data:
+			if "public" in request.data:
 				kwargs["public"] = request.data["public"]
 
 			projects.Project.objects.filter(name=filter).update(**kwargs)
@@ -1081,7 +1118,7 @@ class ProjectsEndpoint:
 			if not user.owner:
 				return classes.ErrorJSONResponse("You must be the project owner in order to delete it.", status=403)
 			translation.Language.objects.filter(host__iexact=filter).delete()
-			translation.LanguageFields.objects.filter(host__iexact=filter).delete()
+			translation.LanguageField.objects.filter(host__iexact=filter).delete()
 			projects.ProjectUser.objects.filter(project__iexact=filter).delete()
 			projects.Project.objects.filter(name__iexact=filter).delete()
 
