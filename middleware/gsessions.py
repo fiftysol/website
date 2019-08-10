@@ -1,5 +1,5 @@
 class Globals:
-	host = "181.230.170.155:5000"
+	host = "127.0.0.1:5000"
 
 	def __getattr__(self, name):
 		return None
