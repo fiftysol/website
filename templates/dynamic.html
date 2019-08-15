@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta property="og:title" content="{% block metatitle %}Fifty Shades of Lua{% endblock %}" data-react-helmet="true" />
+	<title>Fifty Shades of Lua</title>
+	<meta property="og:site_name" content="{% block sitename %}Fifty Shades of Lua{% endblock %}" />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="http://{{ request.globals.host }}{% block metaurl %}{% endblock %}" />
+	<meta property="og:keywords" content="Fifty shades of lua,Software,Technology,Discord,Discord server,Developers,Transformice,Lua,Python,Javascript,Open source" />
+	<meta property="og:image" content="http://{{ request.globals.host }}/static/home/icon.png" />
+	<meta property="og:image" content="/static/home/icon.png" data-react-helmet="true"/>
+	<meta property="og:description" content="{% block ogdescription %}Come and have a good moment with us. We're a community of talented people where everyone is welcome!{% endblock %}" />
+	<meta property="og:description" content="{% block ogdescription_helmet %}Come and have a good moment with us. We're a community of talented people where everyone is welcome!{% endblock %}" data-react-helmet="true" />
+	<meta name="description" content="{% block description %}Come and have a good moment with us. We're a community of talented people where everyone is welcome!{% endblock %}" />
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" type="text/css" href="https://unpkg.com/aos@2.3.1/dist/aos.css">
+	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+	<link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+	<script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/sweetalert2@8"></script>
+	<script type="text/javascript" src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+	<link rel="stylesheet" type="text/css" href="/static/animate.css">
+	<link rel="stylesheet" type="text/css" href="/static/dynamic.css">
+</head>
+<body class="background">
+	{% include "navbar.html" %}
+	<div id="whole-page-loading"><div class="lds-ellipsis"><div></div><div></div><div></div><div></div></div></div>
+	<div id="updatable-content"></div>
+	<script type="text/javascript" src="/static/basic.js"></script>
+</body>
+</html>
