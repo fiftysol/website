@@ -18,7 +18,7 @@ def view(request, version, path):
 	if version not in versions.index:
 		return classes.ErrorJSONResponse("The given API version was not found.", status=404)
 	if versions.index[version][1] not in ["default", "stable"]:
-		return classes.ErrorJSONResponse("The given API version can not be used.", status=400)
+		return classes.ErrorJSONResponse("The given API version can not be used by yourself.", status=403)
 
 	result = versions.index[version][0](result, path)
 
