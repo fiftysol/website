@@ -1,11 +1,13 @@
+import threading
+import traceback
 import socket
 import struct
+import queue
 import json
 import os
 
 class Socket:
-	def __init__(self, _globals):
-		self.globals = _globals
+	def __init__(self):
 		self.connected = False
 		self.sock = None
 
@@ -80,12 +82,69 @@ class Socket:
 				return self.recv(recall=False)
 			return (False,)
 
+class ScheduledCall:
+	def __init__(self, **kwargs):
+		self.call = None
+		self.args = ()
+		self.kwargs = {}
+		self.resulted = False
+		self.result = None
+
+		for key, value in kwargs.items():
+			setattr(self, key, value)
+
+	def set_result(self, result):
+		self.result = result
+		self.resulted = True
+
+	def wait_complete(self):
+		while not self.resulted:
+			pass
+
+		return self.result
+
+class SocketProcessing:
+	def __init__(self, sock):
+		self.sock = sock
+		self.queue = queue.Queue()
+		self.allow_send = True
+
+	def send(self, *args, block_recv=False, **kwargs):
+		while not self.allow_send:
+			pass
+
+		self.allow_send = False
+		schedule = ScheduledCall(call=self.sock.send, args=args, kwargs=kwargs)
+		self.queue.put(schedule)
+		return schedule.wait_complete()
+
+	def recv(self, *args, **kwargs):
+		schedule = ScheduledCall(call=self.sock.recv, args=args, kwargs=kwargs)
+		self.queue.put(schedule)
+		self.allow_send = True
+		return schedule.wait_complete()
+
+	def loop(self):
+		while True:
+			obj = self.queue.get()
+
+			try:
+				result = obj.call(*obj.args, **obj.kwargs)
+			except:
+				traceback.print_exc()
+				obj.set_result((False,))
+			else:
+				obj.set_result(result)
+
 class CommunicationMiddleware:
 	def __init__(self, get_response):
 		self.get_response = get_response
+		self.processing = SocketProcessing(Socket())
+
+		threading.Thread(target=self.processing.loop).start()
 
 	def __call__(self, request):
 		if request.globals.socket is None:
-			request.globals.socket = Socket(request.globals)
+			request.globals.socket = self.processing
 
 		return self.get_response(request)

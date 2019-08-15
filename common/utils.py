@@ -10,16 +10,17 @@ def send_and_recv(socket, data, deep=True, json=True):
 	if socket is None:
 		resp = "Socket instance was not initialized."
 		if json:
-			resp = classes.ErrorJSONResponse(resp, status=500)
+			resp = classes.ErrorJSONResponse(resp, status=503)
 		if deep:
 			raise classes.DeepReturn(resp)
 		return resp
 
-	sent = socket.send(data)
+	sent = socket.send(data, block_recv=True)
 	if not sent:
+		socket.allow_send = True
 		resp = "Failed to connect to the gateway."
 		if json:
-			resp = classes.ErrorJSONResponse(resp, status=500)
+			resp = classes.ErrorJSONResponse(resp, status=503)
 		if deep:
 			raise classes.DeepReturn(resp)
 		return resp
@@ -31,7 +32,7 @@ def send_and_recv(socket, data, deep=True, json=True):
 	elif recv[0]:
 		resp = "Gateway Error: " + recv[1]["error"]
 		if json:
-			resp = classes.ErrorJSONResponse(resp, status=500)
+			resp = classes.ErrorJSONResponse(resp, status=503)
 		if deep:
 			raise classes.DeepReturn(resp)
 		return resp
@@ -39,7 +40,7 @@ def send_and_recv(socket, data, deep=True, json=True):
 	else:
 		resp = "Failed to receive data from the gateway."
 		if json:
-			resp = classes.ErrorJSONResponse(resp, status=500)
+			resp = classes.ErrorJSONResponse(resp, status=503)
 		if deep:
 			raise classes.DeepReturn(resp)
 		return resp
