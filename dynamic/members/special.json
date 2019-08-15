@@ -1,0 +1,4 @@
+{
+	"(?i)^members/+\\d+$": "members/member",
+	"(?i)^members/+@me$": "members/member"
+}

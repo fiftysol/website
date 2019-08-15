@@ -1,0 +1,59 @@
+<div class="logo">
+	<img src="/static/home/fifty_shades.png" class="resize-big" animate="fadeInUp" hide="true">
+	<img src="/static/home/of_lua.png" class="resize-small" animate="fadeInUp" hide="true">
+	<div class="pre-menu hidden" animate="fadeInDown" hide="true">
+		<a href="#about" class="normal">%about%</a><vl> </vl>
+		{% if request.user.logged %}
+			<a href="/api/oauth2/logout/" class="normal">%logout%</a>
+		{% else %}
+			<a href="/api/oauth2/authorize/" class="normal">%login%</a>
+		{% endif %}<vl> </vl>
+		<a href="#" class="normal">%projects%</a><vl> </vl>
+		<a href="#members/index" class="normal">%members%</a><vl> </vl>
+		<a href="#" class="normal">%statistics%</a><vl> </vl>
+		<a href="#announcements/index" class="normal">%announcements%</a>
+	</div>
+</div>
+
+<div id="after-navbar"></div>
+
+<div id="about">
+	<div class="about-info-container"><div class="about-panel" id="about-info">
+		<h3>%about%</h3>
+		%about_info%
+	</div></div>
+	<div class="more-info-container"><div class="about-panel" id="more-info">
+		<h3>%keep_reading%</h3>
+		<div id="more-info-text">
+			<div class="mglass"><i class="fa fa-search"></i></div>
+			%more_info%
+		</div>
+		<div id="community" class="hidden">%high_community%</div>
+	</div></div>
+</div>
+<div style="margin-bottom:2rem"></div>
+
+<div id="announcements">
+	<div class="announcement" data-aos="fade-up">
+		<div>
+			<img src="https://cdn.discordapp.com/avatars/596775737764085781/d6b1cc1e894e824366df5a254aed68a1?size=128" class="announcement-author-avatar big-round">
+			<span class="announcement-author-name" style="color:#95a5a6;">Darky <span class="bot-tag">BOT</span></span>
+			<span class="announcement-author-date real-date">{{ right_now }}</span>
+		</div>
+		<hr class="announcement-separator">
+		<div class="announcement-content">
+			We're establishing a communication with our servers right now to show you some of our members and our last announcements! Please, be patient, this will only take a few seconds.
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		elements = document.getElementsByClassName("real-date");
+		for (var index = 0; index < elements.length; index++) {
+			var element = elements[index];
+
+			element.innerHTML = (new Date(parseInt(element.innerHTML) * 1000)).toLocaleString();
+		}
+	</script>
+</div>
+<div id="members" style="max-width:100%;text-align:center;"></div>
+<div style="margin-bottom:10rem;"></div>
