@@ -2,6 +2,7 @@
 
 import django.middleware.csrf as csrf
 
+from django.shortcuts import render
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from urllib.parse import urlencode
 from common.utils import send_and_recv
@@ -11,9 +12,11 @@ import translation.setup as translation_setup
 import projects.backend as projects
 import common.classes as classes
 import api.versions.base as base
+import traceback
 import datetime
 import requests
 import json
+import time
 import os
 import re
 
@@ -23,6 +26,11 @@ mpl.rcParams["xtick.color"] = "gray"
 mpl.rcParams["ytick.color"] = "gray"
 mpl.rcParams["text.color"] = "gray"
 from matplotlib import pyplot as plt
+
+THIS_DIR = os.path.dirname(__file__)
+WEB_DIR = os.path.dirname(os.path.dirname(THIS_DIR))
+DYNAMIC_DIR = os.path.join(WEB_DIR, "dynamic")
+DYNAMIC_ERROR = os.path.join(DYNAMIC_DIR, "error")
 
 def supported_methods(name, *methods):
 	_methods = list(methods)
@@ -1122,13 +1130,112 @@ class ProjectsEndpoint:
 			projects.ProjectUser.objects.filter(project__iexact=filter).delete()
 			projects.Project.objects.filter(name__iexact=filter).delete()
 
+class DynamicEndpoint:
+	def get_page(self, request, file, page, **kwargs):
+		with open(file + ".json", "r") as file:
+			data = json.loads(file.read())
+
+		data["content"] = render(request, page + ".html", context={"request": request, "right_now": time.time()}).content.decode()
+		return classes.JSONResponse(data, **kwargs)
+
+	@supported_methods("dynamic", "GET")
+	def dynamic_view(self, request, path, *, page=""):
+		if ".." in page:
+			return self.get_page(request, DYNAMIC_ERROR, "error", status=404)
+
+		file = os.path.join(DYNAMIC_DIR, page)
+		if os.path.isfile(file + ".json") and os.path.isfile(file + ".html"):
+			try:
+				return self.get_page(request, file, page)
+			except:
+				traceback.print_exc()
+				return self.get_page(request, DYNAMIC_ERROR, "error", status=500)
+
+		else:
+			special_paths = os.path.join(os.path.dirname(file), "special.json")
+			if os.path.isfile(special_paths):
+				with open(special_paths, "r") as file:
+					paths = json.loads(file.read())
+
+				for path, file in paths.items():
+					if re.search(path, page) is not None:
+						return self.get_page(request, os.path.join(DYNAMIC_DIR, file), file)
+			return self.get_page(request, DYNAMIC_ERROR, "error", status=404)
+
+class MembersEndpoint:
+	@supported_methods("members", "GET")
+	def members_view(self, request, path, *, filter_type, filter):
+		if filter_type == ":":
+			if filter == "all":
+				data = send_and_recv(request.globals.socket, {
+					"type": "get_member_profiles",
+					"users": send_and_recv(request.globals.socket, {
+						"type": "get_member_profiles_quantity"
+					})["quantity"]
+				})
+				return classes.JSONResponse(data["users"])
+
+			elif filter == "quantity":
+				data = send_and_recv(request.globals.socket, {
+					"type": "get_member_profiles_quantity"
+				})
+				return classes.JSONResponse({"quantity": data["quantity"]})
+
+			elif filter.isdigit():
+				data = send_and_recv(request.globals.socket, {
+					"type": "get_member_profiles",
+					"users": int(filter)
+				})
+				return classes.JSONResponse(data["users"])
+
+			else:
+				return self.malformed()
+
+		elif filter.isdigit():
+			data = send_and_recv(request.globals.socket, {
+				"type": "get_member_profiles",
+				"users": [filter]
+			})
+			return classes.JSONResponse(data["users"])
+
+		elif "/" in filter:
+			users = []
+			for user in filter.split("/"):
+				if user.isdigit():
+					users.append(user)
+				else:
+					return self.malformed()
+
+			data = send_and_recv(request.globals.socket, {
+				"type": "get_member_profiles",
+				"users": users
+			})
+			return classes.JSONResponse(data["users"])
+
+		elif filter == "me":
+			if request.user.logged:
+				data = send_and_recv(request.globals.socket, {
+					"type": "get_member_profiles",
+					"users": [request.user.id]
+				})
+				result = data["users"]
+				result["id"] = request.user.id
+				return classes.JSONResponse(result)
+
+			return classes.ErrorJSONResponse("You're not logged in.", status=403)
+
+		else:
+			return self.malformed()
+
 class API(
 		base.BaseAPIClass,
 		GraphsEndpoint,
 		AnnouncementsEndpoint,
 		OAuth2Endpoint,
 		TranslationEndpoint,
-		ProjectsEndpoint
+		ProjectsEndpoint,
+		DynamicEndpoint,
+		MembersEndpoint
 	):
 
 	routes = {
@@ -1150,7 +1257,7 @@ class API(
 		r"(?i)^oauth2/*$": "malformed",
 
 		r"(?i)^translate/+compile/+(?P<host>[^/]+)/+(?P<language>.{2})/*$": "translation_compile_view",
-		r"(?i)^translate/+(?P<host>[^/]+)/+(?P<language>auto|.{2})/+(?P<fields>.+)$": "translation_view",
+		r"(?i)^translate/+(?P<host>[^/]+)/+(?P<language>auto|.{2})/+(?P<fields>.+?)/*$": "translation_view",
 		r"(?i)^translate/+(?P<host>[^/]+)/+(?P<language>auto|.{2})/*$": "translation_view",
 		r"(?i)^translate/+(?P<host>[^/]+)/*$": "translation_list",
 		r"(?i)^translate/*$": "translation_language_selector",
@@ -1160,4 +1267,11 @@ class API(
 		r"(?i)^projects/+(?P<filter_type>:|@)(?P<filter>[^/]+)/*$": "projects_view",
 		r"(?i)^projects/+.*": "malformed",
 		r"(?i)^projects/*$": "malformed",
+
+		r"(?i)^members/+(?P<filter_type>:|@)(?P<filter>.+?)/*$": "members_view",
+		r"(?i)^members/+.*$": "malformed",
+		r"(?i)^members/*$": "malformed",
+
+		r"(?i)^dynamic/+(?P<page>.*?)/*$": "dynamic_view",
+		r"(?i)^dynamic/*$": "dynamic_view",
 	}
