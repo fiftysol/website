@@ -10,20 +10,20 @@
 				<a class="nav-link" href="https://discord.gg/quch83R" target="_blank">Discord</a>
 			</li>
 			<li class="nav-item{% if where == 'home' %} active{% endif %}">
-				<a class="nav-link" href="/">{{ translate.home }}</a>
+				<a class="nav-link" href="#home/index">{{ translate.home }}</a>
 			</li>
 			<li class="nav-item dropdown">
 				<a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
 					{{ translate.tools }}
 				</a>
 				<div class="dropdown-menu dark-dropdown-menu" aria-labelledby="toolsDropdown">
-					<button class="dropdown-item{% if where == 'members' %} btn-dark active{% endif %}" type="button" onclick="javascript:window.location.href='/members/';">
+					<button class="dropdown-item{% if where == 'members' %} btn-dark active{% endif %}" type="button" onclick="javascript:window.location.href='#members/index';">
 						{{ translate.members }}
 					</button>
 					<button class="dropdown-item{% if where == 'statistics' %} btn-dark active{% endif %}" type="button" onclick="javascript:window.location.href='#';">
 						{{ translate.statistics }}
 					</button>
-					<button class="dropdown-item{% if where == 'announcements' %} btn-dark active{% endif %}" type="button" onclick="javascript:window.location.href='/announcements/';">
+					<button class="dropdown-item{% if where == 'announcements' %} btn-dark active{% endif %}" type="button" onclick="javascript:window.location.href='#announcements/index';">
 						{{ translate.announcements }}
 					</button>
 				</div>
@@ -67,9 +67,3 @@
 		</ul>
 	</div>
 </nav>
-
-<script>
-	after_load(function(){
-		$("#navigation-bar").addClass("fixed-top");
-	});
-</script>
